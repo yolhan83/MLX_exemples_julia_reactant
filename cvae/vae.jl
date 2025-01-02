@@ -10,13 +10,13 @@ function (UC ::UpsamplingConv)(x,ps,st)
     return res,st
 end
 
-struct Encoder{PMu,PLV} <: Lux.AbstractLuxContainerLayer{(:conv1,:conv2,:conv3,:bn1,:bn2,:bn3,:proj_mu,:proj_log_var)}
-    conv1 ::Lux.Conv
-    conv2::Lux.Conv
-    conv3::Lux.Conv
-    bn1::Lux.BatchNorm
-    bn2::Lux.BatchNorm
-    bn3::Lux.BatchNorm
+struct Encoder{C1,C2,C3,BN1,BN2,BN3,PMu,PLV} <: Lux.AbstractLuxContainerLayer{(:conv1,:conv2,:conv3,:bn1,:bn2,:bn3,:proj_mu,:proj_log_var)}
+    conv1 ::C1
+    conv2::C2
+    conv3::C3
+    bn1::BN1
+    bn2::BN2
+    bn3::BN3
     proj_mu::PMu
     proj_log_var::PLV
 end
@@ -50,12 +50,10 @@ function (E::Encoder)(z,ps,st)
     x = relu.(x)
     # @info size(x)
     x = reshape(x,(size(x,1)*size(x,2)*size(x,3),size(x,4))) 
-    # @info size(x),E.proj_mu
     mu,_ = E.proj_mu(x,ps.proj_mu,st.proj_mu)
     log_var,_ = E.proj_log_var(x,ps.proj_log_var,st.proj_log_var)
     sigma = exp.(0.5f0 .* log_var)
-    eps = randn(size(sigma))
-    # @info size(mu),size(sigma),size(eps)
+    eps = randn(Float32,size(sigma))
     x = mu .+ sigma .* eps
     return x,mu,log_var,st
 end
