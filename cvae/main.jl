@@ -52,7 +52,7 @@ function main()
     mnist_test = MLDatasets.MNIST(:test)
     batch_size = 128
     num_epochs = 32
-    learning_rate = 1e-3
+    learning_rate = 1f-3
     imshape = (28,28,1) 
     imgs_train = reshape(mnist_train.features,
         (
