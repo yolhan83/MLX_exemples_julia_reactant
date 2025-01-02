@@ -4,7 +4,7 @@ include("cvae/vae.jl")
 
 Reactant.set_default_backend("gpu")
 const rng = Random.MersenneTwister(123)
-const dev = cpu_device() # xla_device() when it will work or if you want to see the error
+const dev = xla_device() # xla_device() when it will work or if you want to see the error
 
 
 function grid_image_from_batch(image_batch, num_rows)
@@ -27,10 +27,10 @@ function grid_image_from_batch(image_batch, num_rows)
 end
 
 
-function loss_fn(model,ps,st,X)
+function loss_fn(model,ps,st,(X,))
     X_recon,mu,logvar,_ = model(X,ps,st)
     recon_loss = MSELoss()(X_recon,X)
-    kl_div = -0.5f0*sum(1 .+ logvar .- mu.*mu .- exp.(logvar))
+    kl_div = -0.5f0*sum(1.0f0 .+ logvar .- mu.*mu .- exp.(logvar))
     return recon_loss + kl_div,st,(;)
 end
 
@@ -72,25 +72,14 @@ function main()
         )[:,:,:,1:10] |> f32
     model = VAE(64,imshape,128)
     ps,st = Lux.setup(rng,model) |> dev
-    dl_train = DataLoader(imgs_train,batchsize=batch_size,shuffle=true,partial=false)|> dev
+    dl_train = DataLoader((imgs_train,),batchsize=batch_size,shuffle=true,partial=false)|> dev
     opt = Training.TrainState(model,ps,st,Adam(learning_rate))
-    ## !!!!!!!!!!!!!!!!
-    ## not working yet
-    ## errors with: 
-    ##  'stablehlo.transpose' op using value defined outside the region
-    ##  ERROR: "failed to run pass manager on module"
-
-    ## not even on cpu_device because of some Enzyme Duplicated(Decoder,RefValue) error
-
-    ## note : gradient can be calculated when using Reactant, but not when using cpu, however training still fail
-
-    ## works with AutoZygote() on cpu, did not try on gpu (I'm on wsl and gpu is a mess)
     for epoch in 1:num_epochs
-        for (i,x) in enumerate(dl_train)
+        for (i,(x,)) in enumerate(dl_train)
             _,loss,_,opt = Training.single_train_step!(
-                AutoZygote(),
+                AutoEnzyme(),
                 loss_fn,
-                x,
+                (x,),
                 opt
             )
             if i==1
@@ -99,8 +88,8 @@ function main()
         end
     end
     ps = opt.parameters
-    # m = @compile model(dev(imgs_test),ps,st)
-    recon = model(dev(imgs_test),ps,st)[1]#m(dev(imgs_test),ps,st)[1]
+    m = @compile model(dev(imgs_test),ps,st)
+    recon = m(dev(imgs_test),ps,st)[1]#model(dev(imgs_test),ps,st)[1]#
     paired_images = cat(imgs_test, collect(recon),dims=1)
     grid_image = grid_image_from_batch(paired_images, 5)
     fig = plot(colorview(Gray, grid_image[:,:,1]')) 
