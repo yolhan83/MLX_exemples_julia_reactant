@@ -30,7 +30,7 @@ end
 function loss_fn(model,ps,st,X)
     X_recon,mu,logvar,_ = model(X,ps,st)
     recon_loss = MSELoss()(X_recon,X)
-    kl_div = -0.5*sum(1 .+ logvar .- mu.*mu .- exp.(logvar))
+    kl_div = -0.5f0*sum(1 .+ logvar .- mu.*mu .- exp.(logvar))
     return recon_loss + kl_div,st,(;)
 end
 
