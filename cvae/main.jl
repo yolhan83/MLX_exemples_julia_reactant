@@ -61,7 +61,7 @@ function main()
             1,
             size(mnist_train.features,3)
         )
-        )
+        ) |> f32
     imgs_test = reshape(mnist_test.features,
         (
             size(mnist_test.features,1),
